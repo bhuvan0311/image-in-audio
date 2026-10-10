@@ -23,3 +23,7 @@ The format is deliberately independent of the old Haar/FFT audio-watermark refer
 The shared `advanced.py` renderer keeps the earlier lab's source selection, gain, generated image/text payloads, Haar decomposition/subbands, strength, blocks, saved PCM16 recovery, waveforms/spectra, attacks/batch exports, block measurements, candidate WAV/reference extraction and method notes. `lab.py` runs the same renderer standalone. These are independent experiments; their controls do not silently change either automatic mode. Historical lab attack findings are unchanged and do not establish robustness of audio in PNG.
 
 Implementation references: [FFmpeg libopus options](https://ffmpeg.org/ffmpeg-codecs.html#libopus) and [Streamlit expander](https://docs.streamlit.io/develop/api-reference/layout/st.expander), checked 2026-10-10. Validation and live deployment observations are recorded in `VALIDATION.md` and `../deployment/hosting-status.json`.
+# Current default: full quality
+
+The app now defaults to a private PNG audio attachment that preserves full image dimensions and decoded 8-bit RGBA pixels. It does not use the RGB-LSB method described below. That earlier pixel-steganography method remains in Advanced options, and existing PNGs still decode. See [FULL_QUALITY.md](FULL_QUALITY.md) for the current default, exact scope and limits.
+

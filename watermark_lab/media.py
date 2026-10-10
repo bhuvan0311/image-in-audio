@@ -125,6 +125,12 @@ def decode_image_audio(audio, reference):
     bounded(reference)
     try:
         ref = json.loads(reference)
+        if isinstance(ref, dict) and ref.get("schema") == "image-in-wav-chunk-v1":
+            from .full_quality import decode_full_image_audio
+            result = decode_full_image_audio(audio)
+            if hashlib.sha256(result["image"]).hexdigest() != ref["image"]["sha256"]:
+                raise ValueError("Image verification failed. Use the matching WAV and reference.")
+            return result
         if not isinstance(ref, dict) or ref.get("schema") != SCHEMA:
             raise ValueError("Use the reference downloaded from the image app.")
         validate_reference(ref["dsp"])
@@ -153,7 +159,11 @@ def download_bundle(run):
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("watermarked.wav", run["audio"])
         archive.writestr("reference.json", run["reference"])
-        archive.writestr("README.txt", "Upload this ZIP in Decode to recover the image and play the audio. Keep the WAV unchanged. The reference is required and is not an encryption key. The image is embedded in the audio samples; this ZIP does not contain an image file.\n")
+        attachment = run.get("storage") == "file attachment"
+        archive.writestr("README.txt", "Upload this ZIP in Decode to recover the image and play the audio. Keep the WAV unchanged. " +
+            ("The full-resolution image is a private attachment inside the WAV container, not a DSP watermark. The WAV also decodes alone. " if attachment else
+             "The matching reference is required and is not an encryption key. The image is embedded in the audio samples. ") +
+            "This ZIP does not contain an image sidecar. Neither method encrypts the image.\n")
     return buf.getvalue()
 
 

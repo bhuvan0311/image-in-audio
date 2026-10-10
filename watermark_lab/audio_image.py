@@ -95,6 +95,10 @@ def _carrier_size(size, required_pixels, allow_resize):
 
 def extract_audio_bytes(image_data):
     """Read a validated Opus payload without an original image or reference file."""
+    from .full_quality import extract_full_audio
+    attached = extract_full_audio(image_data)
+    if attached is not None:
+        return attached
     im, _ = _image(image_data, carrier=True)
     rgb = np.asarray(im, dtype=np.uint8)[..., :3].copy().reshape(-1)
     if rgb.size < HEADER.size * 8:

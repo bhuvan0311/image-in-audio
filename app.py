@@ -2,6 +2,7 @@
 import streamlit as st
 from watermark_lab.media import create_image_audio, decode_image_audio, download_bundle, read_bundle, demo_inputs
 from watermark_lab.audio_image import create_audio_image, decode_audio_image
+from watermark_lab.full_quality import create_full_image_audio, create_full_audio_image, decode_full_image_audio
 
 st.set_page_config(page_title="Image & Audio Lab", page_icon="🎵", layout="centered")
 st.title("Image & Audio Lab")
@@ -33,14 +34,16 @@ def render_image_in_audio():
         st.write("Add your image and audio, then click Embed. The app chooses the settings and checks the saved result.")
         image = st.file_uploader("Image", key="image_upload", help="PNG, JPEG, WebP, BMP, TIFF, GIF, ICO and AVIF. First frame/page only. Maximum 16 megapixels.")
         audio = audio_source("image_in_audio", "simple_audio_upload")
-        st.caption("Audio becomes mono, 16 kHz WAV. Large images are resized to fit; the embedded size is shown. Colour and transparency are preserved in the prepared image.")
+        experimental = st.session_state.get("image_storage", "Full quality") == "DSP watermark"
+        st.caption("Experimental DSP mode may shrink images to fit its small capacity." if experimental else
+                   "Full quality: the image keeps its original resolution and pixels. It is stored as an attachment inside the WAV file. Audio becomes mono, 16 kHz WAV.")
         submit = st.button("Embed", type="primary", disabled=image is None or audio is None)
         demo = st.button("Try a ready-made example")
         if submit or demo:
             try:
                 with st.spinner("Preparing files, embedding and checking the downloaded audio…"):
                     a, i = demo_inputs() if demo else (audio.getvalue(), image.getvalue())
-                    result = create_image_audio(a, i)
+                    result = create_image_audio(a, i) if experimental else create_full_image_audio(a, i)
                     result["bundle"] = download_bundle(result)
                     st.session_state["image_run"] = result
             except ValueError as exc:
@@ -50,12 +53,15 @@ def render_image_in_audio():
             info = run["image_info"]
             st.subheader("Last completed embedding")
             st.success("Verified: the image recovered from the saved audio matches exactly.")
-            st.image(run["image"], caption=f"Image embedded: {info['embedded_size'][0]} × {info['embedded_size'][1]} pixels", width=256)
+            st.image(run["image"], caption=f"Image embedded: {info['embedded_size'][0]} × {info['embedded_size'][1]} pixels", width="stretch")
+            if run.get("storage") == "file attachment":
+                st.info("Original resolution and image pixels preserved. The image is attached inside the WAV; this is file embedding, not a DSP watermark.")
             if info["resized"]:
                 st.info(f"Resized from {info['original_size'][0]} × {info['original_size'][1]} to fit the audio. Recovery is exact for the image shown here.")
             if info["first_frame_only"]:
                 st.info("Only the first frame/page of the uploaded image was embedded.")
-            st.write("Watermarked audio")
+            st.download_button("Download full-size embedded image", run["image"], "embedded.png", "image/png")
+            st.write("Audio with embedded image")
             st.audio(run["audio"], format="audio/wav")
             st.download_button("Download audio + reference ZIP", run["bundle"], "image-in-audio.zip", "application/zip", type="primary")
             with st.expander("Separate files and verification"):
@@ -67,24 +73,27 @@ def render_image_in_audio():
                          "snr_db": run["metrics"]["snr_db"], "duration_seconds": run["audio_info"]["duration_seconds"]})
 
     with decode_tab:
-        st.write("Upload the ZIP downloaded after Embed, then click Decode.")
-        bundle = st.file_uploader("Audio + reference ZIP", type=["zip"], key="bundle_upload")
+        st.write("Upload the WAV or ZIP downloaded after Embed, then click Decode. Older DSP watermark files require their matching reference.")
+        bundle = st.file_uploader("Audio with image (WAV or ZIP)", type=["wav", "zip"], key="bundle_upload")
         with st.expander("Use separate WAV and reference files"):
             marked = st.file_uploader("Watermarked WAV", type=["wav"], key="marked_upload")
             reference = st.file_uploader("Reference JSON", type=["json"], key="reference_upload")
-        st.caption("Keep the matching reference. This method needs it to recover the image; it is not an encryption key.")
+        st.caption("Full-quality WAVs decode on their own. Keep the matching reference for older DSP watermark files; it is not an encryption key.")
         if st.button("Decode", type="primary", disabled=bundle is None and (marked is None or reference is None)):
             try:
                 with st.spinner("Recovering and verifying image…"):
-                    a, r = read_bundle(bundle.getvalue()) if bundle is not None else (marked.getvalue(), reference.getvalue())
-                    st.session_state["image_decoded"] = decode_image_audio(a, r)
+                    if bundle is not None and bundle.getvalue().startswith(b"RIFF"):
+                        st.session_state["image_decoded"] = decode_full_image_audio(bundle.getvalue())
+                    else:
+                        a, r = read_bundle(bundle.getvalue()) if bundle is not None else (marked.getvalue(), reference.getvalue())
+                        st.session_state["image_decoded"] = decode_image_audio(a, r)
             except ValueError as exc:
                 st.error(str(exc))
         if "image_decoded" in st.session_state:
             recovered = st.session_state["image_decoded"]
             st.subheader("Last completed decode")
             st.success("Image recovered and verified.")
-            st.image(recovered["image"], caption="Recovered image", width=256)
+            st.image(recovered["image"], caption="Recovered image — original embedded resolution", width="stretch")
             st.audio(recovered["audio"], format="audio/wav")
             st.download_button("Download recovered image", recovered["image"], "recovered.png", "image/png")
 
@@ -94,13 +103,13 @@ def render_image_in_audio():
     3. Play the watermarked audio and download the ZIP.
     4. In **Decode**, upload that ZIP and click **Decode**. Compare the recovered image with the preview.
 
-    Files are limited to **24 MB** each. Audio is limited to **3 minutes** and converted to **mono, 16 kHz**. Images are limited to **16 megapixels**; the app embeds a lossless PNG representation, resizing if needed to fit up to 8 KB of payload. Animated and multipage images use the first frame/page. Support depends on the installed image and audio codecs; unsupported or DRM-protected files show an error.
+    Files are limited to **24 MB** each, including the finished output. Audio is limited to **3 minutes** and converted to **mono, 16 kHz**. Images are limited to **16 megapixels**. Full quality preserves the full resolution and decoded 8-bit RGBA image pixels in a lossless PNG attachment inside the WAV. It never shrinks the image; if the complete output is too large, it shows an error. Animated and multipage images use the first frame/page. JPEG becomes PNG without adding another JPEG compression step; original file bytes and 16-bit/HDR fidelity are not promised.
 
     Recordings need browser microphone permission and HTTPS (or localhost). After you stop, the recording is uploaded to this app for processing. Switching back to **Upload audio** selects an uploaded file instead of a recording. To share a personal message in one picture, choose **Audio in Image**, record, embed and send the downloaded PNG as an original file/document; the recipient can recover and listen using this website's Decode tab.
 
-    Use the downloaded **WAV unchanged**. MP3 conversion, cropping, volume changes and other edits can damage the image. An invalid recovery shows an error instead of an unverified image. The reference contains original transform coefficients and image metadata; the ZIP does not contain the image itself.
+    Use the downloaded **WAV unchanged**. Conversion or editing can strip its attachment. Full-quality WAVs decode without a reference; ZIPs and earlier DSP WAV/reference pairs also work. The ZIP contains no separate image file. DSP watermark mode remains under Advanced options and may resize images substantially to fit its 8-KB capacity.
 
-    This app demonstrates reference-dependent watermarking. It does not encrypt images or prove inaudibility, resistance to attacks, or secure communication. Hosting instructions are in `docs/HOSTING.md`; the detailed DSP experiments are available below in **Advanced options**.
+    Full quality uses file embedding, not audio-sample watermarking. Neither method encrypts images or establishes secure communication. Hosting instructions are in `docs/HOSTING.md`; the detailed DSP experiments are available below in **Advanced options**.
     """)
 
 
@@ -110,16 +119,21 @@ def render_audio_in_image():
         st.write("Add a picture and audio, then click Embed. Download one PNG containing the hidden audio.")
         image = st.file_uploader("Cover image", key="cover_upload", help="PNG, JPEG, WebP, BMP, TIFF, GIF, ICO or AVIF. Up to 16 megapixels; first frame/page only.")
         audio = audio_source("audio_in_image", "hidden_audio_upload")
-        st.caption("Audio is converted to mono 16 kHz and compressed with Opus (48 kbps by default). The picture is resized when needed, up to 5 megapixels. Recovery is exact for the compressed audio, not the original file.")
+        experimental = st.session_state.get("audio_image_storage", "Full quality") == "Pixel steganography"
+        st.caption("Experimental pixel mode may resize the cover to hold the audio." if experimental else
+                   "Full quality: original image resolution and pixels stay unchanged. Audio is attached inside the PNG file and compressed with Opus (48 kbps by default).")
         submit = st.button("Embed", type="primary", disabled=image is None or audio is None)
         demo = st.button("Try a ready-made example")
         if submit or demo:
             try:
                 with st.spinner("Preparing files, embedding audio and checking the saved PNG…"):
                     a, i = demo_inputs() if demo else (audio.getvalue(), image.getvalue())
-                    st.session_state["audio_image_run"] = create_audio_image(a, i,
-                        bitrate=st.session_state.get("audio_image_bitrate", 48),
-                        allow_resize=st.session_state.get("audio_image_resize", True))
+                    if experimental:
+                        result = create_audio_image(a, i, bitrate=st.session_state.get("audio_image_bitrate", 48),
+                            allow_resize=st.session_state.get("audio_image_resize", True))
+                    else:
+                        result = create_full_audio_image(a, i, bitrate=st.session_state.get("audio_image_bitrate", 48))
+                    st.session_state["audio_image_run"] = result
             except ValueError as exc:
                 st.error(str(exc))
         if "audio_image_run" in st.session_state:
@@ -127,7 +141,9 @@ def render_audio_in_image():
             info = run["image_info"]
             st.subheader("Last completed embedding")
             st.success("Verified: the audio recovered from the saved PNG matches exactly.")
-            st.image(run["image"], caption=f"Audio-containing PNG: {info['embedded_size'][0]} × {info['embedded_size'][1]} pixels", width=256)
+            st.image(run["image"], caption=f"Audio-containing PNG: {info['embedded_size'][0]} × {info['embedded_size'][1]} pixels", width="stretch")
+            if run.get("storage") == "file attachment":
+                st.info("Original resolution and image pixels preserved exactly. Audio is attached inside the PNG; this is file embedding, not pixel steganography.")
             if info["resized"]:
                 st.info(f"Resized from {info['original_size'][0]} × {info['original_size'][1]} pixels to hold the audio. Keep the downloaded PNG unchanged.")
             if info["first_frame_only"]:
@@ -155,16 +171,16 @@ def render_audio_in_image():
 
     with help_tab:
         st.markdown("""1. Choose **Audio in Image**, add a cover, and choose **Upload audio** or **Record audio**. For a personal message, press the microphone, speak, stop and click **Embed**.
-2. Download **image with hidden audio**. The audio is inside the PNG's pixels.
+2. Download **image with hidden audio**. Full quality attaches the audio inside the PNG without changing its image pixels.
 3. Open **Decode**, upload that PNG and click **Decode** to listen and download the recovered audio.
 
 Keep the **downloaded PNG unchanged**. Screenshots, resizing, JPEG conversion, colour adjustments and messaging services that compress pictures can destroy the audio. Send it as an original file/document.
 
 Share the downloaded PNG and this website link. The recipient selects **Audio in Image → Decode**, uploads your PNG, and listens. Recording needs browser microphone permission and HTTPS (or localhost). Once stopped, the recording is uploaded to this app for processing. If the microphone is unavailable, use Upload audio to add a recording made on your phone or computer.
 
-Audio is limited to **3 minutes / 24 MB** and converted to **mono 16 kHz** before lossy Opus compression. Its compressed bytes recover exactly; this does not preserve the original song's file bytes or full fidelity. Covers accept the same supported image formats as Image in Audio, up to **16 megapixels**. The output is always an 8-bit RGBA PNG, automatically resized to at most **5 megapixels**, and uses the first frame/page. Transparent pixels retain their alpha values after resizing.
+Audio is limited to **3 minutes / 24 MB** and converted to **mono 16 kHz** before lossy Opus compression. Its compressed bytes recover exactly; this does not preserve the original song's file bytes or full fidelity. Covers accept the same supported image formats as Image in Audio, up to **16 megapixels**. Full quality preserves original resolution and decoded 8-bit RGBA pixels, including transparency, and uses the first frame/page. It never resizes or edits pixels. The finished PNG must fit within 24 MB. Original file bytes and 16-bit/HDR fidelity are not promised. Experimental Pixel steganography can resize to its 5-megapixel carrier limit.
 
-This is pixel steganography with a corruption check. It is not encryption or authenticated communication. Anyone with the app can recover the audio. Advanced audio-quality and resizing controls, verification details and the earlier DSP experiments are below in **Advanced options**.
+Full quality is file embedding with a corruption check, not encryption or pixel steganography. Anyone with the app can recover the audio. Experimental pixel steganography remains in Advanced options and can resize the cover. Both new and earlier downloaded PNGs decode here.
 """)
 
 
@@ -175,10 +191,15 @@ else:
 
 with st.expander("Advanced options", expanded=False):
     st.caption("Automatic modes work without these controls. The earlier DSP lab is preserved here; its settings apply to the advanced experiment, separately from the automatic modes.")
+    st.subheader("Embedding method")
+    st.selectbox("Image in Audio method", ["Full quality", "DSP watermark"], key="image_storage",
+                 help="Full quality preserves the image resolution/pixels using a WAV attachment. DSP watermark is experimental and can shrink the image substantially.")
+    st.selectbox("Audio in Image method", ["Full quality", "Pixel steganography"], key="audio_image_storage",
+                 help="Full quality preserves image pixels using a PNG attachment. Pixel steganography edits RGB low bits and may resize the cover.")
     st.subheader("Audio in Image settings")
     st.selectbox("Audio quality (kbps)", [32, 48, 64], index=1, key="audio_image_bitrate",
                  help="Higher bitrate increases the hidden audio size and may require a larger picture.")
-    st.checkbox("Resize image automatically", value=True, key="audio_image_resize")
+    st.checkbox("Resize image automatically", value=True, key="audio_image_resize", help="Applies only to experimental Pixel steganography. Full quality never resizes.")
     if "audio_image_run" in st.session_state:
         run = st.session_state["audio_image_run"]
         st.json({"image": run["image_info"], "audio": run["audio_info"]})
