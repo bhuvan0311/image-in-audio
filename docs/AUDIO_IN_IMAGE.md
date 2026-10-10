@@ -2,6 +2,8 @@
 
 Choose **Audio in Image**, upload a cover and audio, click **Embed**, and download `audio-in-image.png`. In the same mode's **Decode** tab, upload that PNG and click **Decode** to listen and download the recovered audio. No reference or original cover is required. Existing Image in Audio ZIPs use their original mode and remain compatible.
 
+You can choose **Record audio** instead of an upload to capture a personal message. Allow browser microphone access, speak, stop, review and embed. A stopped recording is supplied as 16-kHz WAV and goes through the same bounded preparation and saved-PNG verification. Switching back to Upload audio explicitly selects a file instead of the recording. Microphone recording requires HTTPS or localhost; the stopped recording is uploaded to the host for processing. Send the resulting PNG unchanged as an original file/document and share the app link so the recipient can decode and listen. Implementation uses the official [Streamlit audio input](https://docs.streamlit.io/develop/api-reference/widgets/st.audio_input).
+
 ## Automatic preparation
 
 The existing bounded FFmpeg conversion accepts WAV, MP3, FLAC, M4A, AAC, OGG, Opus, AIFF and WMA, depending on codecs. Audio is limited to 24,000,000 bytes and 180 seconds and converted to mono 16 kHz with headroom. It is encoded as Ogg Opus at 48 kbps constant bitrate by default; Advanced options offers 32, 48 or 64 kbps. Opus is lossy. Exact recovery means the saved compressed audio bytes match, not the original recording's samples or file bytes. The WAV player decodes the recovered payload for browser compatibility.

@@ -60,17 +60,23 @@ def render_advanced_lab():
         settings,view = st.columns([1,2.1],gap="large")
         with settings:
             st.subheader("Set up an experiment")
-            source = st.radio("Audio source",["Generated example","Upload WAV"],horizontal=True,key="audio_source")
+            source = st.radio("Audio source",["Generated example","Upload WAV","Record audio"],horizontal=True,key="audio_source")
             x=None; fs=16000
             if source == "Generated example":
                 signal = st.selectbox("Generated audio",["harmonic","chirp","noise","silence"],key="generated_audio")
                 duration = st.slider("Duration (seconds)",1,5,2,key="duration")
                 x = generate_audio(signal,fs,duration)
-            else:
+            elif source == "Upload WAV":
                 upload = st.file_uploader("PCM or float WAV (≤24 MB)",type=["wav"],key="audio_upload")
                 stereo = st.selectbox("Stereo conversion",["reject","mean","left"],key="stereo_mode")
                 if upload:
                     try: fs,x = read_wav(upload.getvalue(),stereo)
+                    except ValueError as exc: st.error(str(exc))
+            else:
+                recording = st.audio_input("Record audio for the advanced experiment", sample_rate=16000, key="lab_recording")
+                st.caption("Allow microphone access, record and stop before running the experiment. Up to 3 minutes; the stopped recording is uploaded for processing.")
+                if recording is not None:
+                    try: fs,x = read_wav(recording.getvalue(),"mean")
                     except ValueError as exc: st.error(str(exc))
             attenuation = st.slider("Input gain for headroom",.1,1.0,1.0,.05,key="input_gain")
             if x is not None: x=x*attenuation

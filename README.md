@@ -4,6 +4,8 @@ Live public app: https://image-in-audio-bhuvan0311.streamlit.app/
 
 Choose **Image in Audio** or **Audio in Image**, upload an image and audio, and click Embed. Settings are automatic. Image in Audio downloads a WAV plus reference ZIP; Audio in Image downloads one PNG that contains the compressed audio in its pixels. Decode the downloaded ZIP or PNG in the corresponding mode, then play and download the result.
 
+Both modes offer **Upload audio** and **Record audio**. For a personal message, choose Record audio, allow browser microphone access, speak, stop, preview and click Embed. Recordings need HTTPS or localhost and obey the same 3-minute/24-MB bounds. The recording is uploaded to the host after stopping. To share, send the downloaded PNG unchanged as an original file/document and the app link; the recipient uses Audio in Image → Decode. The app does not send messages to recipients automatically.
+
 **Advanced options** preserves the full earlier DSP lab: audio source, gain, binary image/text payload, Haar subband and level, FFT strength, blocks, waveform/spectrum inspection, controlled attacks, reproducible batch, block timing and reference-based extraction. These settings apply to the advanced experiment independently of the automatic modes. Audio in Image also offers 32/48/64 kbps quality and optional automatic resizing.
 
 ## Deploy

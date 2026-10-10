@@ -9,13 +9,30 @@ st.write("Hide an image in audio, or audio in an image. Embed, download and reco
 mode = st.radio("What would you like to hide?", ["Image in Audio", "Audio in Image"], horizontal=True, key="hiding_mode")
 
 
+def audio_source(prefix, upload_key):
+    choice = st.radio("Choose audio source", ["Upload audio", "Record audio"],
+                      horizontal=True, key=f"{prefix}_audio_source")
+    if choice == "Upload audio":
+        return st.file_uploader("Audio or song", key=upload_key,
+            help="WAV, MP3, FLAC, M4A, AAC, OGG, Opus, AIFF or WMA. Up to 24 MB and 3 minutes; no DRM.")
+    st.caption("Press the microphone to start, then stop when finished. Allow microphone access if your browser asks. Keep your message under 3 minutes.")
+    audio = st.audio_input("Record a personal message", sample_rate=16000,
+                          key=f"{prefix}_recording",
+                          help="The stopped recording is uploaded to this app for processing. You can listen before embedding. If your microphone is unavailable, switch to Upload audio.")
+    if audio is not None:
+        st.write("Your recording")
+        st.audio(audio.getvalue(), format="audio/wav")
+        st.caption("Recording ready. Click Embed to use this message with your image.")
+    return audio
+
+
 def render_image_in_audio():
     embed_tab, decode_tab, help_tab = st.tabs(["Embed", "Decode", "Help"])
 
     with embed_tab:
         st.write("Add your image and audio, then click Embed. The app chooses the settings and checks the saved result.")
         image = st.file_uploader("Image", key="image_upload", help="PNG, JPEG, WebP, BMP, TIFF, GIF, ICO and AVIF. First frame/page only. Maximum 16 megapixels.")
-        audio = st.file_uploader("Audio or song", key="simple_audio_upload", help="WAV, MP3, FLAC, M4A, AAC, OGG, Opus, AIFF and WMA. Maximum 24 MB and 3 minutes; no DRM.")
+        audio = audio_source("image_in_audio", "simple_audio_upload")
         st.caption("Audio becomes mono, 16 kHz WAV. Large images are resized to fit; the embedded size is shown. Colour and transparency are preserved in the prepared image.")
         submit = st.button("Embed", type="primary", disabled=image is None or audio is None)
         demo = st.button("Try a ready-made example")
@@ -73,11 +90,13 @@ def render_image_in_audio():
 
     with help_tab:
         st.markdown("""1. Start with **Try a ready-made example** to confirm the app works.
-    2. Upload an image and a song, then click **Embed**.
+    2. Upload an image, choose **Upload audio** or **Record audio**, then click **Embed**. For recording, press the microphone, speak, and stop before embedding.
     3. Play the watermarked audio and download the ZIP.
     4. In **Decode**, upload that ZIP and click **Decode**. Compare the recovered image with the preview.
 
     Files are limited to **24 MB** each. Audio is limited to **3 minutes** and converted to **mono, 16 kHz**. Images are limited to **16 megapixels**; the app embeds a lossless PNG representation, resizing if needed to fit up to 8 KB of payload. Animated and multipage images use the first frame/page. Support depends on the installed image and audio codecs; unsupported or DRM-protected files show an error.
+
+    Recordings need browser microphone permission and HTTPS (or localhost). After you stop, the recording is uploaded to this app for processing. Switching back to **Upload audio** selects an uploaded file instead of a recording. To share a personal message in one picture, choose **Audio in Image**, record, embed and send the downloaded PNG as an original file/document; the recipient can recover and listen using this website's Decode tab.
 
     Use the downloaded **WAV unchanged**. MP3 conversion, cropping, volume changes and other edits can damage the image. An invalid recovery shows an error instead of an unverified image. The reference contains original transform coefficients and image metadata; the ZIP does not contain the image itself.
 
@@ -90,7 +109,7 @@ def render_audio_in_image():
     with embed_tab:
         st.write("Add a picture and audio, then click Embed. Download one PNG containing the hidden audio.")
         image = st.file_uploader("Cover image", key="cover_upload", help="PNG, JPEG, WebP, BMP, TIFF, GIF, ICO or AVIF. Up to 16 megapixels; first frame/page only.")
-        audio = st.file_uploader("Audio or song", key="hidden_audio_upload", help="WAV, MP3, FLAC, M4A, AAC, OGG, Opus, AIFF or WMA. Up to 24 MB and 3 minutes.")
+        audio = audio_source("audio_in_image", "hidden_audio_upload")
         st.caption("Audio is converted to mono 16 kHz and compressed with Opus (48 kbps by default). The picture is resized when needed, up to 5 megapixels. Recovery is exact for the compressed audio, not the original file.")
         submit = st.button("Embed", type="primary", disabled=image is None or audio is None)
         demo = st.button("Try a ready-made example")
@@ -135,11 +154,13 @@ def render_audio_in_image():
             st.download_button("Download playable WAV", result["playback_wav"], "recovered.wav", "audio/wav")
 
     with help_tab:
-        st.markdown("""1. Choose **Audio in Image**, add your files and click **Embed** (or try the ready-made example).
+        st.markdown("""1. Choose **Audio in Image**, add a cover, and choose **Upload audio** or **Record audio**. For a personal message, press the microphone, speak, stop and click **Embed**.
 2. Download **image with hidden audio**. The audio is inside the PNG's pixels.
 3. Open **Decode**, upload that PNG and click **Decode** to listen and download the recovered audio.
 
 Keep the **downloaded PNG unchanged**. Screenshots, resizing, JPEG conversion, colour adjustments and messaging services that compress pictures can destroy the audio. Send it as an original file/document.
+
+Share the downloaded PNG and this website link. The recipient selects **Audio in Image → Decode**, uploads your PNG, and listens. Recording needs browser microphone permission and HTTPS (or localhost). Once stopped, the recording is uploaded to this app for processing. If the microphone is unavailable, use Upload audio to add a recording made on your phone or computer.
 
 Audio is limited to **3 minutes / 24 MB** and converted to **mono 16 kHz** before lossy Opus compression. Its compressed bytes recover exactly; this does not preserve the original song's file bytes or full fidelity. Covers accept the same supported image formats as Image in Audio, up to **16 megapixels**. The output is always an 8-bit RGBA PNG, automatically resized to at most **5 megapixels**, and uses the first frame/page. Transparent pixels retain their alpha values after resizing.
 
