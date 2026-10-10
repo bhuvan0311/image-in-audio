@@ -3,7 +3,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY app.py start_server.py ./
+COPY app.py advanced.py lab.py start_server.py ./
 COPY watermark_lab ./watermark_lab
 COPY docs ./docs
 COPY .streamlit ./.streamlit

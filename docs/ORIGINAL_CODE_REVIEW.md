@@ -1,0 +1,20 @@
+# Original-code review
+
+Inspected read-only on 2026-10-10. `source_manifest.json` records exact paths, sizes and SHA-256 hashes. Original source files remain outside this project. No commercial audio, supplied payload images, or network credentials are redistributed. This is static source review; the MATLAB scripts were not executed, and no hardware was connected.
+
+| Finding | Multilevel MATLAB evidence | Single-level MATLAB evidence | Consequence and correction |
+|---|---|---|---|
+| Modified extraction reference | Magnitudes overwritten at 70–71, 91–92, 112–113; subtracted at 153–168 | Overwrite at 24; subtract at 47 | The subtracted array already includes the watermark. With ideal unchanged reconstruction the difference would be zero. Store unmodified complex coefficients before embedding. |
+| FFT asymmetry | Positive-side edits at 70–113; `real(ifft(...))` at 75, 96, 117 | Edit at 24; `real(ifft(...))` at 28 | Real signals require paired conjugate bins. Taking only the real part hides the imaginary residual and changes the intended perturbation. Use `rfft`/`irfft` and leave DC/Nyquist untouched. |
+| Normalization changes reference | Input peak normalization 9; output normalization 128 | Input 3; output 32 | The output gain scales every spectrum coefficient. Extraction cannot subtract a reference at another scale. Silence also divides by zero. Baseline does not normalize; input gain is explicit, recorded through the stored reference, and clipping is rejected. |
+| Reversed detail labels | 54 calls the first detail slice level 1; 55 calls the second level 2 | Not applicable | Level-2 order is A2, D2, D1. Variables at 54/55 therefore name the opposite levels. Correct indexing is tested against independent Haar arithmetic. |
+| In-memory extraction | WAV write 131; extraction from `watermarked_audio` at 145 | WAV write 35; extraction from `watermarked_audio` at 40 | File quantization is never measured. Baseline extracts from a saved and reloaded PCM16 byte stream. CLI tests additionally read files on disk. |
+| Reference dependence | Phase and magnitudes originate from original audio | Same | An original/reference spectrum is needed. There is no validated blind method. The corrected export stores the selected original complex coefficients and transform settings. |
+| No implemented SVD | No `svd` or singular-value processing anywhere | No SVD processing | The filename is not evidence of SVD. The new lab is explicitly Haar + FFT. |
+| Input and capacity validation | Only half-spectrum image-count checks | Same | No finite-value, silence, amplitude, real reconstruction, or exact-recovery checks. Fixed 64×64 images are 4096 bits each. New defaults use 64 bits, exclude DC/Nyquist, and validate lengths and formats. |
+
+MATLAB flattens image arrays in column-major order; Python uses explicitly documented C/row-major order. The new metadata is not a drop-in decoder for the old scripts. Missing-image error messages in the multilevel script also refer to different filenames (26/39); these are secondary usability defects.
+
+The Arduino file imports networking, SD, SPI and a web server. Lines 17–37 implement upload writes; 39–62 initialize Wi-Fi, SD and routes; 65–67 service requests. It performs no DWT, FFT, embedding, extraction, audio sampling or playback. Upload success is reported without verifying a complete successful write. User filenames directly form SD paths. Connection startup loops indefinitely if Wi-Fi never connects. These are static observations, not demonstrated board behavior. Credential-bearing lines were excluded from inspection output and no credential values appear in deliverables.
+
+The documented coefficient ordering is supported by [MathWorks wavedec](https://www.mathworks.com/help/wavelet/ref/wavedec.html) and [PyWavelets multilevel DWT](https://pywavelets.readthedocs.io/en/latest/ref/dwt-discrete-wavelet-transform.html). Real FFT conventions are documented by [NumPy rfft](https://numpy.org/doc/stable/reference/generated/numpy.fft.rfft.html). References checked 2026-10-10.

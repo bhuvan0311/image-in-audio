@@ -6,4 +6,4 @@ Official instructions: https://docs.streamlit.io/deploy/streamlit-community-clou
 
 For a Python host, install Python requirements and FFmpeg, then run `python start_server.py`. This reads the host's `PORT` (default 8501). Docker hosting is also configured; the host must provide HTTPS and WebSocket forwarding. The health endpoint is `/_stcore/health`.
 
-After deployment, verify both the generated example and a PNG/MP3 upload through Embed, ZIP download, ZIP upload in Decode, image download and audio playback. Public hosting and concurrent-user behavior must be checked on the actual host.
+After deployment, verify both modes with the generated example and a PNG/MP3 upload through Embed, actual result download, upload in Decode, recovery download and audio playback. Verify Advanced options opens and the earlier experiment still works. Public hosting and concurrent-user behavior must be checked on the actual host.
